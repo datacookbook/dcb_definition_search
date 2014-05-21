@@ -1,0 +1,465 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+	"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xml:lang="en" xmlns="http://www.w3.org/1999/xhtml" lang="en">
+	<head>
+<!--
+Welcome to the Data Cookbook Definition Search
+
+This is a single html file that uses javascript to invoke the Data Cookbook APIs to provide
+a search of your definitions.  It is intended to be embedded in a portal or on another web
+page within an iframe, or a a pop-up.
+
+Follow these steps to make use of this search tool:
+
+1) Copy this html file onto an internal web server and test:
+
+		//
+		//   Identify a location for the dcb_definition_search.html file on your internal web server.  
+		//   For example, it should be something like http://myserver/path/dcb_definition_search.html
+		//
+		//   Test putting this URL into your browser:
+		//    
+		//    http://myserver/path/dcb_definition_search.html
+		//
+		//   That should show the search form and allow you to search our demo account.  
+		//
+
+2) Configure for your account:
+		//  Change the following values to be your subdomain, a valid login and password (it is good to use a user that only has viewer privileges)
+-->
+<script type="text/javascript">
+		DCB_SUBDOMAIN = 'idatau.demo';
+		DCB_USERNAME = 'guest';
+		DCB_PASSWORD = 'cookbook99';
+		
+		// this controls whether the search results will have clickable links into your cookbook
+		// set to no if you don't want them to be links (for public presentation where the people seeing this won't have access)
+		DCB_SHOW_LINKS = 'yes';
+		//DCB_SHOW_LINKS = 'no';		
+</script>
+<!--
+
+3) Test searching for approved definitions.
+
+4) Now we have a functioning definition search tool.  We can start to use it in one of two ways:
+
+ - Pop-up HTML link from any web page:
+ <a href="http://myserver/path/dcb_definition_search.html" 
+ onclick="javascript:void window.open('http://myserver/path/dcb_definition_search.html', 
+       'datacookbook', 'scrollbars=yes,center,height=450,width=500'); return false;">
+       Search the Data Cookbook for Definitions</a>
+ 
+ - IFRAME in a dashboard or portal:
+ <iframe src="http://myserver/path/dcb_definition_search.html" ></iframe>
+  
+
+-->
+		<title>
+			Data Cookbook Definitions
+		</title><!-- Meta Data: Begin -->
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+		<meta http-equiv="Pragma" content="no-cache" />
+		<meta http-equiv="Expires" content="-1" /><!-- Meta Data: End -->
+		<style>
+			html, body, div, span, applet, object, iframe, p, blockquote, pre, a, abbr, acronym, address, big, cite, code, del, dfn, em, font, img, ins, kbd, q, s, samp, small, strike, strong, sub, sup, tt, var, b, u, i, center, fieldset, form, label, legend, table, caption, tbody, tfoot, thead, tr, th, td { background:transparent none repeat scroll 0;border:0 none;margin:0; outline-color:invert; outline-style:none; outline-width:0; padding:0; vertical-align:baseline;}
+			h1, h2, h3, h4, h5, h6 {margin:0,0,0,0;}
+			body {background:#003366; color:#555; line-height:1.5em; font-family: Arial, Helvetica, sans-serif; font-size:75%; font-style:normal; font-variant:normal; font-weight:normal;}
+			a:link, a:visited {text-decoration:none; font-weight: bold; color:#1d4896;}
+			a:hover { text-decoration: underline;}
+			.smallbox { width:300px; float:left; padding:4px 9px; background:#D7DFEA }
+		</style>
+		
+		<script type="text/javascript">
+
+
+		///////////////////////////////////////////////////////////////////////////////////////////////////////
+		//
+		// main handler function for responses from the API
+		//
+		function dcb_processResponse( data_IN ) {
+			// declare variables
+			var responseCode = '';
+			var responseMessage = '';
+			var requestType = '';
+			//
+			// variables for building up the content to insert into HTML
+			//
+			var termList = '';
+			var termCount = -1;
+			var termListIndex = -1;
+			var currentTerm = null;
+			var termName = '';
+			var termFunctionalDefinition = '';
+			var termUrl = '';
+			var resultsElement = '';   // div to store the results
+			var headerElement = '';
+			var termListHtml = '';
+			var headerTextElement = null;
+			var headerLinkElement = null;
+			var bodyElement = '';
+			var listElement = '';
+			//
+			// get response status
+			//
+			responseCode = data_IN.ResponseStatus.ResponseCode;
+			responseMessage = data_IN.ResponseStatus.ResponseMessage;
+			if ( responseCode == 0 ) {
+				// success.  Get request type to see what we need to do now.
+				requestType = data_IN.ServiceName;
+				if ( requestType != '' ) {
+					switch (requestType) {
+						case 'term_search':
+							//
+							// Find the existing DIV, hide it, then clear it
+							//
+							resultsElement = document.getElementById("dcb_definition_search_results");
+							resultsElement.style.display = "none";
+							resultsElement.innerHTML = "";
+	
+							// create the results header  HTML string
+							headerElement = document.createElement( "div" );
+							headerElement.setAttribute( "class", "viewHeader" );
+
+							// add results title
+							headerTextElement = document.createElement( "h2" );
+							headerTextElement.appendChild( document.createTextNode("Search Results") );
+							headerElement.appendChild( headerTextElement );
+
+							// append to results
+							resultsElement.appendChild( headerElement );
+
+							// now, build and attach the element that will hold the
+							//    returned search terms
+							bodyElement = document.createElement( "div" );
+							bodyElement.setAttribute( "class", "viewBody" );
+							// bodyElement.appendChild( document.createElement( "br" ) );
+							resultsElement.appendChild( bodyElement );
+
+							listElement = document.createElement( "div" );
+							listElement.setAttribute( "class", "eventList Events_List" );
+							bodyElement.appendChild( listElement );
+
+							// loop over term array, load and render each
+							//    term in the list.
+							termList = data_IN.TermList;
+
+							// got a term list?
+							if ( termList != null )
+							{
+								// get count, see if we have terms.
+								termCount = termList.length;
+								if ( termCount > 0 )
+								{
+									// got at least one term.  Get the element we will store the
+									//    results in, then output stuff that goes before the
+									//    list of terms.
+
+									// got at least three terms?
+									if ( termCount > 3 )
+									{
+										// yes!  Set height and make box scroll.
+										bodyElement.style.height = "300px";
+										//resultsElement.style.width = "100px";
+										bodyElement.style.overflow = "scroll";
+									}
+
+									//alert( "Request type has terms.  Before loop. Term count: " + termCount );
+									for( termListIndex = 0; termListIndex < termCount; termListIndex++ )
+									{
+										//alert( "Top of term loop. Term index: " + termListIndex );
+										// get next term to process.
+										currentTerm = termList[ termListIndex ][ 'Term' ];
+
+										// get cookie properties
+										//cookieName = currentCookie.Name + "_test";
+										termName = currentTerm.name;
+										termFunctionalDefinition = currentTerm.term_functional_definition;
+										termUrl = currentTerm.perma_link_url;
+
+										//alert( "In term loop. Values for term " + termListIndex + ": name=" + termName + ", URL=" + termUrl + ", functional definition=" + termFunctionalDefinition );
+
+										// create list HTML for term.
+										termListHtml += "<div class=\"Events_ListItem event\">\n";
+										termListHtml += "<span class=\"vevent\">\n";
+										termListHtml += "<div class=\"eventTitle summary\">\n";
+										if (DCB_SHOW_LINKS == 'yes') {
+											termListHtml += "<a target=\"_blank\" class=\"eventLink url\" href=\"" + termUrl + "\">" + termName + "</a>\n";
+										} else {
+											termListHtml += "<b>" + termName + "</b>\n";
+										}
+										termListHtml += "</div>\n";
+										termListHtml += "<div class=\"eventTitle summary\">\n";
+										termListHtml += "<p>" + termFunctionalDefinition + "</p>\n";
+										termListHtml += "</div>\n";
+										termListHtml += "</span>\n";
+										termListHtml += "</div>\n";
+
+									} //-- end loop over terms. --//
+
+									// put the list of terms in the list element
+									listElement.innerHTML = termListHtml;
+
+								} //-- end check to see if we have any terms --//
+								else //-- no matches found. --//
+								{
+									listElement.innerHTML = "No matches found.";
+								}
+
+							}
+							else
+							{
+								// no terms returned.  Output a no results message.
+								listElement.innerHTML = "No matches found.";
+							}
+
+							 // done with the loop, so make visible
+							resultsElement.style.display = "block";
+							break;
+	
+						default:
+							alert( "Error processing Data Cookbook service request: Service " + requestType + " unknown.  ResponseCode: " + responseCode + "; ResponseMessage: " + responseMessage );
+					} 
+				}
+				else {
+					//-- no request type in response - which service? --//
+					// no request type returned.  Error.
+					alert( "Error processing Data Cookbook service request: No service type returned.  ResponseCode: " + responseCode + "; ResponseMessage: " + responseMessage );
+				}
+			}
+			else {
+				//-- error response code returned --//
+				// error.  Output alert, do nothing.
+				alert( "Error processing Data Cookbook service request:  Error code returned.  ResponseCode: " + responseCode + "; ResponseMessage: " + responseMessage );
+			}
+
+		}
+
+
+		///////////////////////////////////////////////////////////////////////////////////////////////////////
+		//
+		// Main class definition for an API call
+		//
+		function dcb_serviceRequest() {
+			//
+			// these are standard for every instance of this class
+			// each one must also be represented in the createRequestURL function
+			//
+			this.token = '';
+			this.username = DCB_USERNAME;
+			this.password = DCB_PASSWORD;
+			this.outputFormat = 'json';
+			this.jsonFunction = 'dcb_processResponse';
+			this.jsonVariable = '';
+			//
+			// these should be set based on form data when creating an instance
+			//
+			this.requestType = '';
+			this.lookup = '';
+			this.search = '';
+			this.matchType = '';
+			this.service_url = '';
+			//
+			// specific to term list API
+			//
+			this.status = '';
+			this.dataSystem = '';
+			this.functionalArea = '';
+			this.termSource = '';
+			this.tag = '';
+			
+			// 
+			// Pieces together the arguments for the request URL
+			//
+			this.createRequestURL = function() {
+				// initialize the variable to hold the complete URL being constructed
+				var URL_OUT = this.service_url;
+
+				// set the first paramater prefix, after the first one, a & will be used.
+				var paramPrefix = '?';
+
+				// see what properties have values, append those with values.
+
+				if ( this.requestType != '' ) {
+					URL_OUT += paramPrefix + "requestType=" + this.requestType;
+					paramPrefix = '&';
+				}
+				if ( this.username != '' ) {
+					URL_OUT += paramPrefix + "un=" + this.username;
+					paramPrefix = '&';
+				}
+				if ( this.token != '' ) {
+					URL_OUT += paramPrefix + "OR=" + this.token;
+					paramPrefix = '&';
+				}
+				if ( this.password != '' ) {
+					URL_OUT += paramPrefix + "pw=" + this.password;
+					paramPrefix = '&';
+				}
+				if ( this.outputFormat != '' ) {
+					URL_OUT += paramPrefix + "outputFormat=" + this.outputFormat;
+					paramPrefix = '&';
+				}
+				if ( this.jsonFunction != '' ) {
+					URL_OUT += paramPrefix + "jsonFunction=" + this.jsonFunction;
+					paramPrefix = '&';
+				}
+				if ( this.jsonVariable != '' ) {
+					URL_OUT += paramPrefix + "jsonVariable=" + this.jsonVariable;
+					paramPrefix = '&';
+				}
+				if ( this.matchType != '' ) {
+					URL_OUT += paramPrefix + "matchType=" + this.matchType;
+					paramPrefix = '&';
+				}
+				if ( this.lookup != '' ) {
+					URL_OUT += paramPrefix + "lookup=" + this.lookup;
+					paramPrefix = '&';
+				}
+				if ( this.search != '' ) {
+					URL_OUT += paramPrefix + "search=" + this.search;
+					paramPrefix = '&';
+				}
+				//
+				// term list specific ones
+				//
+				if ( this.status != '' ) {
+					URL_OUT += paramPrefix + "status=" + this.status;
+					paramPrefix = '&';
+				}
+				if ( this.dataSystem != '' ) {
+					URL_OUT += paramPrefix + "dataSystem=" + this.dataSystem;
+					paramPrefix = '&';
+				}
+				if ( this.functionalArea != '' ) {
+					URL_OUT += paramPrefix + "functionalArea=" + this.functionalArea;
+					paramPrefix = '&';
+				}
+				if ( this.termSource != '' ) {
+					URL_OUT += paramPrefix + "termSource=" + this.termSource;
+					paramPrefix = '&';
+				}
+				if ( this.tag != '' ) {
+					URL_OUT += paramPrefix + "tag=" + this.tag;
+					paramPrefix = '&';
+				}
+
+				return URL_OUT;
+			};
+
+			//
+			// Outputs contents of this object as a string.
+			//
+			// @return string - contents of this object.	
+			//
+			this.outputContents = function() {
+				// return reference
+				var string_OUT = '';
+
+				// declare variables
+				var currentPropName = '';
+				var outputArray = new Array();
+				var itemCount = 0;
+				var currentValue = '';
+				var currentValueType = '';
+
+				// loop over properties
+				for( currentPropName in this ) {
+					// add current property to output array
+					currentValue = this[ currentPropName ];
+
+					// only output strings, numbers, and booleans.
+					currentValueType = typeof( currentValue );
+					if ( ( currentValueType == "string" ) || ( currentValueType == "number" ) || ( currentValueType == "boolean" ) ) {
+						outputArray[ itemCount ] = currentPropName + "=\"" + this[ currentPropName ] + "\"";
+						itemCount++;
+					}
+				}
+				// join the items in array together with "; ".
+				string_OUT = outputArray.join( ";\n " );
+				// append name of this class to the front.
+				string_OUT = "Contents of service request: " + string_OUT;
+				return string_OUT;
+			};
+
+			//
+			// Uses variables internal to this object to create the URL of the JSONP
+			// javascript include service for our request, then writes the request
+			// into a script tag at the end of the document
+			//
+			this.submitRequest = function() {
+				// declare variables
+				var requestURL = '';
+				var scriptElement = null;
+
+				// get request URL
+				requestURL = this.createRequestURL();
+				//alert('URL created: ' + requestURL);
+		
+				
+				scriptElement = document.createElement( "script" );
+				scriptElement.setAttribute( "src", requestURL );
+				scriptElement.setAttribute( "type", "text/javascript" );
+				document.body.appendChild( scriptElement );
+			};
+
+		}
+
+
+		///////////////////////////////////////////////////////////////////////////////////////////////////////
+		//
+		// Handle the submit of the search and make the request to the API
+		//
+		function dcb_process_search( formID_IN )
+		{
+			// declare variables
+			var formElement = null;
+			var searchString = '';
+			var request = null;
+			//alert( "form = " + formID_IN );
+
+			// got a form ID?
+			if ( formID_IN != '' ) {
+				// retrieve the form element
+				formElement = document.getElementById( formID_IN );
+
+				// search.  Do we have a search string?
+				searchString = formElement.dcb_search_string.value;
+				if ( searchString != '' ) {
+					//alert("search string = " + searchString);
+					request = new dcb_serviceRequest();
+					request.requestType = 'term_search';
+					request.service_url = 'https://' + DCB_SUBDOMAIN + '.datacookbook.com/institution/terms/search';
+					request.search = searchString;
+					request.submitRequest();
+				} else {
+					alert( "No search string, so no search." );
+				}
+			} else {
+				alert( "Error processing IData service request: No form ID passed in." );
+			}
+
+			return false;
+		}
+
+
+		</script>
+	
+	</head>
+	<body>
+		<div class="smallbox">
+			<h2>Data Cookbook Definitions</h2>
+			<form name="dcb_search" id="dcb_search" onsubmit="return dcb_process_search('dcb_search');">
+				<input type="text" name="dcb_search_string" id="dcb_search_string" />
+				<input type="submit" onclick="dcb_process_search( 'dcb_search' )" name="IData_search_button" id="IData_search_button" value="Search" /> 
+			</form>
+			<hr />
+			<div id="dcb_definition_search_results" name="dcb_definition_search_results" style="display:none;">
+			</div>
+		</div>
+	</body>
+				
+<script type="text/javascript">
+		document.forms['dcb_search'].elements['dcb_search_string'].focus();
+</script>
+
+</html>
