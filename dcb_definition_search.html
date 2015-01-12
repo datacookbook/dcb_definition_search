@@ -71,7 +71,6 @@ Follow these steps to make use of this search tool:
 		
 		<script type="text/javascript">
 
-
 		///////////////////////////////////////////////////////////////////////////////////////////////////////
 		//
 		// main handler function for responses from the API
@@ -231,6 +230,12 @@ Follow these steps to make use of this search tool:
 				// error.  Output alert, do nothing.
 				alert( "Error processing Data Cookbook service request:  Error code returned.  ResponseCode: " + responseCode + "; ResponseMessage: " + responseMessage );
 			}
+			
+			// re-enable the search button
+			submitButton = document.getElementById("IData_search_button");
+			submitButton.value = "Search";
+			submitButton.disabled = false;
+
 
 		}
 
@@ -426,11 +431,18 @@ Follow these steps to make use of this search tool:
 				searchString = formElement.dcb_search_string.value;
 				if ( searchString != '' ) {
 					//alert("search string = " + searchString);
+					
+					// disable the search button
+					submitButton = document.getElementById("IData_search_button");
+					submitButton.value = "searching...";
+					submitButton.disabled = true;
+
 					request = new dcb_serviceRequest();
 					request.requestType = 'term_search';
 					request.service_url = 'https://' + DCB_SUBDOMAIN + '.datacookbook.com/institution/terms/search';
 					request.search = searchString;
 					request.submitRequest();
+					
 				} else {
 					alert( "No search string, so no search." );
 				}
@@ -460,6 +472,10 @@ Follow these steps to make use of this search tool:
 				
 <script type="text/javascript">
 		document.forms['dcb_search'].elements['dcb_search_string'].focus();
+		// re-enable the search button on any refresh in case the search was interrupted
+		submitButton = document.getElementById("IData_search_button");
+		submitButton.value = "Search";
+		submitButton.disabled = false;
 </script>
 
 </html>
